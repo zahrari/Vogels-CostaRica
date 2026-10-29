@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vogels van Costa Rica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Concept: veldnotitieboek. Score bovenaan, daaronder een doorzoekbaar raster van soortkaarten met twee grote knoppen (gehoord / gezien). */
+:root{
+  --bg:#eef2e9; --surface:#fbfcf8; --surface2:#e3eadb; --fg:#14281f; --muted:#52645a; --line:#c9d6c2;
+  --accent:#0b6b55; --accent-fg:#ffffff;
+  --heard:#1c6f9c; --seen:#2f7a2a; --both:#9a6200; --special:#a2410e; --on-state:#ffffff;
+  --photo-bg:#d5dfcd;
+  --ff-d:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --ff-b:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0c1713; --surface:#14241d; --surface2:#1b3027; --fg:#e4eee7; --muted:#9db3a6; --line:#2a4036;f
+    --accent:#4cc9a6; --accent-fg:#06231a;
+    --heard:#6bb8e8; --seen:#7fcf6f; --both:#f0b84a; --special:#f09a6b; --on-state:#08140f;
+    --photo-bg:#1e3329; color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--ff-b);
+  padding-block:0 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{font-family:var(--ff-d);text-wrap:balance;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* Kop en score */
+header.top{padding-top:max(20px,env(safe-area-inset-top,0px));padding-bottom:8px}
+.eyebrow{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+h1{font-size:clamp(1.9rem,6vw,3rem);line-height:1.05;letter-spacing:-.01em}
+.lead{color:var(--muted);margin:6px 0 0;max-width:60ch}
+.score{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{min-width:0}
+.stat .n{font-family:var(--ff-d);font-weight:700;font-size:clamp(1.5rem,5vw,2.2rem);line-height:1;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:.5em;color:var(--muted);font-weight:600}
+.stat .l{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.25}
+.stat.h .n{color:var(--heard)} .stat.s .n{color:var(--seen)} .stat.b .n{color:var(--both)}
+.bar{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--surface2);margin-top:14px}
+.bar i{display:block;height:100%;transition:width .3s}
+.bar .ho{background:var(--heard)} .bar .so{background:var(--seen)} .bar .bo{background:var(--both)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.78rem;color:var(--muted);margin-top:8px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:currentColor}
+.legend .ho::before{background:var(--heard)} .legend .so::before{background:var(--seen)} .legend .bo::before{background:var(--both)}
+
+/* Zoeken en filters */
+.tools{margin-top:18px;display:grid;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.search{flex:1 1 240px;min-width:0;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:0 14px}
+.btn{height:48px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.small{height:40px;padding:0 12px;font-size:.9rem}
+select.btn{padding-right:8px}
+.count{color:var(--muted);font-size:.9rem}
+/* Filters: uitschuifpaneel met inklapbare groepen */
+.sheet.fsheet{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0;max-height:88vh}
+.fhead{display:flex;align-items:center;justify-content:space-between;padding:10px 8px 10px 16px;border-bottom:1px solid var(--line)}
+.fhead h2{font-size:1.25rem}
+.fclose{width:44px;height:44px;border-radius:99px;border:0;background:transparent;font-size:1.6rem;line-height:1}
+.fbody{overflow:auto;flex:1;padding:0 16px;overscroll-behavior:contain}
+.acc{border-bottom:1px solid var(--line)}
+.acc:last-child{border-bottom:0}
+.acc summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:52px;cursor:pointer;font-weight:600}
+.acc summary::-webkit-details-marker{display:none}
+.acc summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 4px 4px 0;transition:transform .15s}
+.acc[open] summary::after{transform:rotate(-135deg);margin-bottom:-4px}
+.acc-t{flex:1}
+.acc-count{font-size:.8rem;font-weight:600;background:var(--accent);color:var(--accent-fg);border-radius:99px;padding:1px 9px}
+.acc-count:empty{display:none}
+.acc .chips,.acc .where{padding-bottom:14px}
+.ffoot{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--surface)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:40px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);font-size:.9rem}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
+.where{display:flex;gap:8px;flex-wrap:wrap}
+.where select{flex:1 1 220px;min-width:0}
+
+/* Kaarten */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:18px}
+.card{display:flex;flex-direction:column;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.card.both{border-color:var(--both);box-shadow:0 0 0 1px var(--both)}
+.photo{position:relative;aspect-ratio:4/3;background:var(--photo-bg);flex:none;overflow:hidden}
+.slot{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
+.slot img{width:100%;height:100%;object-fit:cover;display:block}
+.slot svg{width:34%;max-width:90px;opacity:.55}
+.pill{position:absolute;top:10px;font-size:.75rem;font-weight:600;padding:3px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--line)}
+.pill.type{left:10px}
+.pill.type.sp{color:var(--special);border-color:var(--special)}
+.pill.both{right:10px;background:var(--both);color:var(--on-state);border-color:var(--both)}
+.cbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.name{all:unset;cursor:pointer;font-family:var(--ff-d);font-weight:700;font-size:1.15rem;line-height:1.2;text-wrap:balance}
+.name:hover{text-decoration:underline}
+.name:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+.sub{margin:0;font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.tags{margin:0;font-size:.78rem;color:var(--muted)}
+.desc{margin:0;font-size:.9rem}
+.loginfo{margin:0;font-size:.82rem;color:var(--seen)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto;padding-top:8px}
+.tg{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border-radius:12px;border:2px solid var(--line);background:var(--bg);font-weight:600}
+.tg svg{width:20px;height:20px;flex:none}
+.tg.heard{color:var(--heard)} .tg.seen{color:var(--seen)}
+.tg.heard[aria-pressed="true"]{background:var(--heard);border-color:var(--heard);color:var(--on-state)}
+.tg.seen[aria-pressed="true"]{background:var(--seen);border-color:var(--seen);color:var(--on-state)}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0}
+
+/* Lijstweergave */
+.grid.list{grid-template-columns:1fr}
+.grid.list .card{flex-direction:row}
+.grid.list .photo{width:120px;aspect-ratio:1;align-self:stretch;min-height:120px}
+.grid.list .desc{display:none}
+.grid.list .pill{font-size:.68rem;padding:2px 7px;top:6px}
+.grid.list .pill.type{left:6px} .grid.list .pill.both{right:6px}
+.grid.list .photo .pill.type{display:none}
+@media (max-width:520px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:14px}
+  .grid.list .photo{width:96px;min-height:96px}
+}
+
+/* Details */
+.overlay{position:fixed;inset:0;background:rgba(5,15,10,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;
+  padding-top:env(safe-area-inset-top,0px)}
+.overlay[hidden]{display:none}
+.sheet{background:var(--surface);width:100%;max-width:620px;max-height:94vh;overflow:auto;border-radius:20px 20px 0 0;
+  padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+@media (min-width:700px){.overlay{align-items:center}.sheet{border-radius:20px;max-height:90vh}}
+.sheet .photo{aspect-ratio:3/2}
+.sheet .inner{padding:16px;display:grid;gap:12px}
+.sheet h2{font-size:1.6rem;line-height:1.1}
+.close{position:absolute;top:10px;right:10px;z-index:2;width:44px;height:44px;border-radius:99px;border:1px solid var(--line);background:var(--surface);font-size:1.3rem;line-height:1}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:.92rem}
+.facts dt{color:var(--muted)} .facts dd{margin:0}
+.form{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.form label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
+.form input,.form select,.form textarea{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:8px 10px;color:var(--fg);width:100%}
+.form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:420px){.form .two{grid-template-columns:1fr}}
+
+/* Gedeelde lijst */
+.sync{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;font-size:.85rem;color:var(--muted)}
+.sync .btn{height:36px;padding:0 12px;font-size:.85rem}
+.sync #syncTxt{flex:1 1 200px;min-width:0}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
+.dot.live{background:var(--seen)} .dot.err{background:var(--special)}
+.tg.other{border-style:dashed;background:var(--surface2)}
+.err{color:var(--special);font-size:.85rem;margin:0}
+/* Voet */
+footer{margin-top:32px;padding-top:18px;border-top:1px solid var(--line);display:grid;gap:12px;color:var(--muted);font-size:.85rem}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--special);border-radius:12px;padding:10px 12px;color:var(--fg)}
+.confirm[hidden]{display:none}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:max(20px,env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:.9rem;z-index:80;max-width:90vw}
+.toast[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Afvinklijst · 100 soorten</p>
+  <h1>Vogels van Costa Rica</h1>
+  <p class="lead">Vink per soort af of je hem hebt gehoord (met Merlin Bird ID), gezien, of allebei.</p>
+
+  <div class="sync" id="sync" role="status">
+    <span class="dot" id="dot"></span><span id="syncTxt"></span>
+    <button class="btn small" id="shareBtn" hidden>Deel link</button>
+    <button class="btn small" id="whoBtn" hidden>Wijzig</button>
+  </div>
+  <section class="score" aria-label="Totaalscore">
+    <div class="stats">
+      <div class="stat h"><div class="n"><span id="nHeard">0</span><small> / 100</small></div><div class="l">Gehoord met Merlin</div></div>
+      <div class="stat s"><div class="n"><span id="nSeen">0</span><small> / 100</small></div><div class="l">Gezien</div></div>
+      <div class="stat b"><div class="n"><span id="nBoth">0</span><small> / 100</small></div><div class="l">Beide: gehoord en gezien</div></div>
+      <div class="stat"><div class="n"><span id="nAny">0</span><small> / 100</small></div><div class="l">Soorten totaal (gehoord of gezien)</div></div>
+    </div>
+    <div class="bar" role="img" aria-label="Verdeling van je soorten"><i class="bo" id="barBoth"></i><i class="ho" id="barHeard"></i><i class="so" id="barSeen"></i></div>
+    <div class="legend"><span class="bo">Beide</span><span class="ho">Alleen gehoord</span><span class="so">Alleen gezien</span></div>
+  </section>
+</header>
+
+<section class="tools" aria-label="Zoeken en filteren">
+  <div class="row">
+    <label class="sr" for="q">Zoeken</label>
+    <input id="q" class="search" type="search" placeholder="Zoek op naam, kleur, habitat, voedsel, regio of waar je hem zag" autocomplete="off">
+    <button class="btn" id="filterBtn" aria-expanded="false" aria-controls="fOverlay">Filters</button>
+  </div>
+  <div class="row">
+    <label class="sr" for="sortSel">Sorteren</label>
+    <select id="sortSel" class="btn small">
+      <option value="fam">Volgorde: soortgroep</option>
+      <option value="az">Naam A–Z</option>
+      <option value="sp">Bijzonder eerst</option>
+    </select>
+    <button class="btn small" id="viewBtn">Lijstweergave</button>
+    <span class="count" id="count" aria-live="polite"></span>
+  </div>
+</section>
+
+<main class="grid" id="list" aria-label="Vogels"></main>
+
+<footer>
+  <div class="row">
+    <button class="btn small" id="exportBtn">Exporteer mijn lijst</button>
+    <button class="btn small" id="importBtn">Importeer lijst</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <button class="btn small" id="uploadBtn" hidden>Mijn lokale vinkjes toevoegen</button>
+    <button class="btn small" id="resetBtn">Alles resetten</button>
+  </div>
+  <div class="confirm" id="resetConfirm" hidden>
+    <span id="resetMsg">Alle vinkjes en notities wissen? Dit kan niet ongedaan worden gemaakt.</span>
+    <button class="btn small primary" id="resetYes">Ja, wis alles</button>
+    <button class="btn small" id="resetNo">Annuleren</button>
+  </div>
+  <p style="margin:0">Foto's via Wikipedia en Wikimedia Commons, elk met de licentie van de maker. Geluiden herken je met de gratis app Merlin Bird ID van Cornell Lab. Gebruik exporteren om een back-up van de lijst te maken. Nederlandse namen zijn deels vertalingen en kunnen afwijken van de officiële lijst.</p>
+</footer>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Details van de vogel"></div>
+</div>
+<div class="overlay" id="wOverlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Samen afvinken">
+    <div class="inner">
+      <h2>Samen afvinken</h2>
+      <p class="sub">Vul je naam in, zodat anderen zien wie welke vogel heeft gehoord of gezien.</p>
+      <form class="form" id="wForm" style="border-top:0;padding-top:0">
+        <label for="wName">Jouw naam<input id="wName" type="text" maxlength="30" autocomplete="given-name"></label>
+        <label for="wCode">Groepscode<input id="wCode" type="text" maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+        <p class="sub">Iedereen met dezelfde code werkt op dezelfde lijst. Kies een code die niet makkelijk te raden is, bijvoorbeeld costarica-familie-2027.</p>
+        <p class="err" id="wErr" role="alert"></p>
+        <div class="row"><button class="btn primary" type="submit">Verder</button><button class="btn" type="button" id="wCancel">Annuleren</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="fOverlay" hidden>
+  <div class="sheet fsheet" role="dialog" aria-modal="true" aria-label="Filters">
+    <div class="fhead"><h2>Filters</h2><button class="fclose" id="fClose" aria-label="Sluiten">&times;</button></div>
+    <div class="fbody">
+      <details class="acc" open><summary><span class="acc-t">Status</span><span class="acc-count" data-k="status"></span></summary><div class="chips" id="fStatus"></div></details>
+      <details class="acc"><summary><span class="acc-t">Algemeen of bijzonder</span><span class="acc-count" data-k="type"></span></summary><div class="chips" id="fType"></div></details>
+      <details class="acc"><summary><span class="acc-t">Kleur</span><span class="acc-count" data-k="color"></span></summary><div class="chips" id="fColor"></div></details>
+      <details class="acc"><summary><span class="acc-t">Grootte</span><span class="acc-count" data-k="size"></span></summary><div class="chips" id="fSize"></div></details>
+      <details class="acc"><summary><span class="acc-t">Habitat</span><span class="acc-count" data-k="hab"></span></summary><div class="chips" id="fHab"></div></details>
+      <details class="acc"><summary><span class="acc-t">Voedsel</span><span class="acc-count" data-k="food"></span></summary><div class="chips" id="fFood"></div></details>
+      <details class="acc"><summary><span class="acc-t">Regio waar de soort voorkomt</span><span class="acc-count" data-k="reg"></span></summary><div class="chips" id="fReg"></div></details>
+      <details class="acc"><summary><span class="acc-t">Waar ik hem zag of hoorde</span><span class="acc-count" data-k="where"></span></summary>
+        <div class="where"><label class="sr" for="whereSel">Eigen waarneming</label><select id="whereSel" class="btn small"></select></div></details>
+    </div>
+    <div class="ffoot"><button class="btn" id="clearBtn">Wis alles</button><button class="btn primary" id="fShow">Toon vogels</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<!-- Vogeldata. Per vogel: [nl, en, wetenschappelijk, A(lgemeen)/B(ijzonder), grootte k/m/g, kleuren, habitat-letters, voedsel, regio-letters, omschrijving]
+     Habitat: r regenwoud, n nevelwoud, k kust/mangrove, w moeras/wetland, b bergen, t tuinen/open land
+     Voedsel: ne nectar, fr fruit, in insecten, vi vis, ro roofvogel, za zaden, al alleseter
+     Regio: M Monteverde, O Osa, T Tortuguero, A Arenal, C Carara, D Cerro de la Muerte, G Guanacaste, K Caribische kust, P Pacifische kust -->
+<script id="data">
+const ROWS=[
+["Vuurkeelkolibrie","Fiery-throated Hummingbird","Panterpe insignis","B","k","blauw,groen,oranje","nb","ne,in","MD","Bergkolibrie met een keel die als vuur oplicht en een blauwe kruin; verdedigt bloeiende struiken fel."],
+["Groene violetoorkolibrie","Green Violetear","Colibri thalassinus","A","k","groen,blauw","nbt","ne,in","MD","Metaalgroene kolibrie met violette oorvlekken, vaak op bloemen in de bergen."],
+["Violette sabelvleugel","Violet Sabrewing","Campylopterus hemileucurus","B","m","paars,zwart,wit","nr","ne,in","MK","Grootste kolibrie van het land, diep paars met witte staarthoeken; komt vaak op voederbakken af."],
+["Groene heremietkolibrie","Green Hermit","Phaethornis guy","A","m","groen,blauw,bruin","rn","ne,in","MAK","Kolibrie met lange gebogen snavel die bloemen langs een vaste route bezoekt."],
+["Roodstaartamazilia","Rufous-tailed Hummingbird","Amazilia tzacatl","A","k","groen,bruin","tr","ne,in","GPCK","De algemeenste kolibrie van het land, te zien in tuinen en langs bosranden."],
+["Fonkelkolibrie","Scintillant Hummingbird","Selasphorus scintilla","B","k","oranje,bruin,groen","bt","ne,in","DO","Een van de kleinste vogels van Costa Rica; het mannetje heeft een oranjerode keel."],
+["Vulkaankolibrie","Volcano Hummingbird","Selasphorus flammula","B","k","paars,bruin,groen","bt","ne,in","D","Komt alleen voor in de hoge bergen van Costa Rica en West-Panama."],
+["Talamancakolibrie","Talamanca Hummingbird","Eugenes spectabilis","B","g","paars,groen,zwart","bn","ne,in","D","Grote bergkolibrie met paarse kruin en turquoise keel."],
+["Groenkruinbrilliantkolibrie","Green-crowned Brilliant","Heliodoxa jacula","A","m","groen,wit,paars","rn","ne,in","MAKO","Grote groene kolibrie met witte buik; het mannetje heeft een violette keelvlek."],
+["Quetzal","Resplendent Quetzal","Pharomachrus mocinno","B","g","groen,rood,wit","n","fr","MD","Beroemdste vogel van Midden-Amerika; het mannetje heeft zeer lange sleepveren. Eet wilde avocado's."],
+["Zwartkoptrogon","Black-headed Trogon","Trogon melanocephalus","A","m","geel,blauw,zwart","rt","fr,in","GPC","Trogon met gele buik en zwarte kop, zit vaak lang stil op een tak in droger bos."],
+["Grijsstaarttrogon","Slaty-tailed Trogon","Trogon massena","A","g","rood,groen,grijs","r","fr,in","COTK","Grote trogon met rode buik; de staart is van onderen grijs met fijne strepen."],
+["Oranjebuiktrogon","Orange-bellied Trogon","Trogon aurantiiventris","B","m","oranje,groen","nb","fr,in","D","Trogon van de hoge bergbossen met een oranje buik."],
+["Turkooiswenkbrauwmotmot","Turquoise-browed Motmot","Eumomota superciliosa","B","m","turquoise,bruin,groen","rt","in,fr","GP","Opvallende motmot met lange staart die hij als een slinger heen en weer zwaait."],
+["Lessons motmot","Lesson's Motmot","Momotus lessonii","A","m","groen,blauw,bruin","rt","in,fr","AKP","Motmot met blauwe kruinrand en een zwarte vlek op de borst, vaak aan bosranden."],
+["Roodbruine motmot","Rufous Motmot","Baryphthengus martii","B","g","bruin,groen,blauw","r","in,fr","KTO","Grootste motmot van het land; zit stil in het regenwoud en jaagt vanaf een tak."],
+["Zwavelborsttoekan","Keel-billed Toucan","Ramphastos sulfuratus","A","g","zwart,geel,groen,oranje","rt","fr","TKA","De regenboogtoekan met zijn kleurrijke snavel, vooral aan de Caribische kant."],
+["Geelkeeltoekan","Yellow-throated Toucan","Ramphastos ambiguus","A","g","zwart,geel,bruin","r","fr","OCP","Grote toekan met geel gezicht en tweekleurige snavel; de roep klinkt als gekwaak."],
+["Halsbandarassari","Collared Aracari","Pteroglossus torquatus","A","m","groen,geel,rood,zwart","r","fr","TKA","Kleine toekan met een zwart-rode band over de gele buik; reist in groepjes."],
+["Vuursnavelarassari","Fiery-billed Aracari","Pteroglossus frantzii","B","m","oranje,groen,geel,zwart","r","fr","OCP","Aracari van de zuidelijke Pacifische kant met een vuurrode snavel; alleen in Costa Rica en Panama."],
+["Smaragdtoekanet","Emerald Toucanet","Aulacorhynchus prasinus","A","m","groen,blauw","nb","fr,in","MAD","Kleine groene toekan van nevelwoud en bergbossen, vaak bij fruitbomen."],
+["Rode ara","Scarlet Macaw","Ara macao","B","g","rood,geel,blauw","rk","fr,za","COP","Grote rode papegaai met geel-blauwe vleugels; de populatie herstelt rond Carara en de Osa."],
+["Groene ara","Great Green Macaw","Ara ambiguus","B","g","groen,blauw,rood","r","fr","TK","Zeldzame, bedreigde ara die afhankelijk is van de bergamandelboom."],
+["Oranjevoorhoofdparkiet","Orange-fronted Parakeet","Eupsittula canicularis","A","k","groen,oranje,blauw","rt","fr,za","GP","Luidruchtige kleine papegaai met oranje voorhoofd, vliegt in groepen door het droge noordwesten."],
+["Finsch' parkiet","Crimson-fronted Parakeet","Psittacara finschi","A","m","groen,rood","tb","fr,za","AM","Groene parkiet met rood voorhoofd, vaak in grote groepen te horen en te zien."],
+["Witkruinpapegaai","White-crowned Parrot","Pionus senilis","A","m","groen,wit,blauw","r","fr","KTA","Papegaai met witte kruin en blauwe kop; trekt in groepen tussen slaapplaats en voedselbomen."],
+["Roodteugelamazone","Red-lored Parrot","Amazona autumnalis","A","m","groen,rood,geel","rt","fr,za","KGP","Groene amazone met rood voorhoofd en gele wangen; vliegt luid krijsend in paren."],
+["Harpij","Harpy Eagle","Harpia harpyja","B","g","grijs,zwart,wit","r","ro","OK","Een van de krachtigste roofvogels ter wereld; in Costa Rica zeer zeldzaam."],
+["Koningsgier","King Vulture","Sarcoramphus papa","B","g","wit,zwart,oranje","r","ro","OTK","Witte gier met kleurrijk kaal hoofd; zweeft hoog boven het regenwoud."],
+["Zwarte gier","Black Vulture","Coragyps atratus","A","g","zwart","tk","ro","GPKC","Zwarte aasgier die je overal in het laagland ziet cirkelen."],
+["Roodkopgier","Turkey Vulture","Cathartes aura","A","g","zwart,rood","t","ro","GPKC","Aasgier met rode kale kop; ruikt aas van grote afstand."],
+["Wegbuizerd","Roadside Hawk","Rupornis magnirostris","A","m","bruin,grijs,oranje","t","ro","GPC","Kleine buizerd die vaak op palen en draden langs wegen zit."],
+["Lachvalk","Laughing Falcon","Herpetotheres cachinnans","A","m","bruin,wit","rt","ro","GPC","Valk met zwart oogmasker die slangen vangt; roept met een luide, lachende reeks."],
+["Visarend","Osprey","Pandion haliaetus","A","m","bruin,wit","k","vi","PKT","Duikt op vis vanuit de lucht; in Costa Rica vooral als wintergast."],
+["Zwaluwstaartwouw","Swallow-tailed Kite","Elanoides forficatus","B","g","zwart,wit","r","ro,in","TKO","Sierlijke roofvogel met diep gevorkte staart die insecten vangt in de vlucht."],
+["Jabiru","Jabiru","Jabiru mycteria","B","g","wit,zwart,rood","w","vi","GT","Reusachtige ooievaar met rode kraag; in Costa Rica zeldzaam."],
+["Amerikaanse nimmerzat","Wood Stork","Mycteria americana","A","g","wit,zwart","w","vi","GP","Grote ooievaar met kaal grijs hoofd; tast in ondiep water naar vis."],
+["Grote zilverreiger","Great Egret","Ardea alba","A","g","wit","wk","vi","GPT","Grote witte reiger die roerloos in ondiep water staat."],
+["Kleine blauwe reiger","Little Blue Heron","Egretta caerulea","A","m","blauw,grijs","wk","vi","TKP","Leigrijze reiger; jonge vogels zijn wit en verkleuren naar blauw."],
+["Groene reiger","Green Heron","Butorides virescens","A","k","groen,bruin","wk","vi","TKPG","Kleine, schuwe reiger langs rivieren en in mangroven."],
+["Lepelreiger","Boat-billed Heron","Cochlearius cochlearius","B","m","grijs,zwart,wit","wk","vi","TGK","Nachtreiger met enorme brede snavel en grote ogen; overdag rustend in mangroven."],
+["Mexicaanse tijgerreiger","Bare-throated Tiger-Heron","Tigrisoma mexicanum","A","g","bruin,grijs,geel","w","vi","TGP","Grote reiger met gele kale keel, vaak roerloos langs rivieren."],
+["Rozenlepelaar","Roseate Spoonbill","Platalea ajaja","B","g","roze,wit","w","vi,in","GP","Roze vogel met platte lepelsnavel waarmee hij door ondiep water zeeft."],
+["Amerikaanse slangenhalsvogel","Anhinga","Anhinga anhinga","A","g","zwart,wit","wk","vi","TG","Zwemt met alleen de lange hals boven water en droogt de vleugels in de zon."],
+["Bruine pelikaan","Brown Pelican","Pelecanus occidentalis","A","g","bruin,wit,grijs","k","vi","PK","Duikt vanuit de lucht in zee voor vis en vliegt in rijen laag over de golven."],
+["Amerikaanse fregatvogel","Magnificent Frigatebird","Fregata magnificens","A","g","zwart,rood","k","vi","PK","Zeevogel die urenlang zweeft; het mannetje blaast een rode keelzak op."],
+["Amazone-ijsvogel","Amazon Kingfisher","Chloroceryle amazona","A","m","groen,wit,oranje","wk","vi","TKP","Groene ijsvogel die langs rivieren zit; het mannetje heeft een roodbruine borst."],
+["Geringde ijsvogel","Ringed Kingfisher","Megaceryle torquata","A","g","grijs,oranje,wit","wk","vi","TP","Grootste ijsvogel van het land, roept luid bij het overvliegen langs rivieren."],
+["Noordelijke jacana","Northern Jacana","Jacana spinosa","A","k","bruin,geel,rood","w","in","TGK","Loopt met lange tenen over drijvende waterplanten; geel schild op het voorhoofd."],
+["Zonneral","Sunbittern","Eurypyga helias","B","m","bruin,oranje,grijs","rw","in,vi","KO","Schuwe rivierbewoner die bij dreiging de vleugels spreidt met een opvallend oogpatroon."],
+["Koerlan","Limpkin","Aramus guarauna","A","g","bruin,wit","w","in","TG","Moerasvogel die vooral slakken eet; krijst luid, vooral 's nachts."],
+["Grote tinamoe","Great Tinamou","Tinamus major","B","g","bruin,grijs","r","fr,za","OTK","Schuwe vogel van de bosbodem; zijn fluitende roep is een typisch regenwoudgeluid."],
+["Kuifguan","Crested Guan","Penelope purpurascens","B","g","bruin,rood,zwart","rn","fr","MA","Grote boombewoner met rode keelzak, vaak hoog in fruitbomen."],
+["Grote hokko","Great Curassow","Crax rubra","B","g","zwart,geel,bruin","r","fr","OK","Zeldzame bosvogel; het mannetje is glanzend zwart met een gele knobbel op de snavel."],
+["Grijskopchachalaca","Gray-headed Chachalaca","Ortalis cinereiceps","A","m","bruin,grijs","rt","fr,za","GPC","Luidruchtige vogel in groepjes, vooral bij zonsopkomst te horen."],
+["Roodstaartjacamar","Rufous-tailed Jacamar","Galbula ruficauda","B","m","groen,bruin,wit","r","in","COP","Slanke vogel met lange snavel die vlinders en libellen vangt vanaf een tak."],
+["Eekhoornkoekoek","Squirrel Cuckoo","Piaya cayana","A","m","bruin,grijs,zwart","rt","in","GPCK","Rosse koekoek met lange staart die als een eekhoorn door de takken rent."],
+["Groefsnavelani","Groove-billed Ani","Crotophaga sulcirostris","A","m","zwart","t","in","GP","Sociale koekoek die in groepjes rondloopt en gezamenlijk nestelt."],
+["Brilbosuil","Spectacled Owl","Pulsatrix perspicillata","B","g","bruin,wit","r","ro","OKC","Grote uil met een witte bril rond de ogen en een diepe, dalende roep."],
+["Pauraque","Common Pauraque","Nyctidromus albicollis","A","m","bruin,grijs","t","in","GP","Nachtvogel die op wegen en paden zit; zijn ogen weerkaatsen het licht oranje."],
+["Grote reuzennachtzwaluw","Great Potoo","Nyctibius grandis","B","g","grijs,bruin","r","in","OKC","Camoufleert zich als een boomstronk en roept 's nachts met een rauwe schreeuw."],
+["Inkaduifje","Inca Dove","Columbina inca","A","k","bruin,grijs","t","za","GP","Kleine duif met geschubde veren, vaak bij dorpen."],
+["Witvleugelduif","White-winged Dove","Zenaida asiatica","A","m","grijs,wit,bruin","t","za,fr","GP","Duif met witte vleugelrand, talrijk in de droge streken."],
+["Bandstaartduif","Band-tailed Pigeon","Patagioenas fasciata","A","g","grijs,paars,wit","nb","fr,za","MD","Bergduif met witte nekband, vliegt vaak in groepen."],
+["Zwartwangspecht","Black-cheeked Woodpecker","Melanerpes pucherani","A","m","zwart,wit,rood,geel","rt","fr,in","AKT","Zwart-witte specht met rode kruin; eet ook veel fruit."],
+["Hoffmanns specht","Hoffmann's Woodpecker","Melanerpes hoffmannii","A","m","geel,rood,zwart,wit","t","fr,in","GPC","Algemene specht in tuinen en droog bos, goed te horen."],
+["Bleeksnavelspecht","Pale-billed Woodpecker","Campephilus guatemalensis","B","g","rood,zwart,wit","r","in","GPC","Grote specht met rode kop (mannetje) en een opvallende lichte snavel."],
+["Gestreepte specht","Lineated Woodpecker","Dryocopus lineatus","A","g","zwart,wit,rood","rt","in","GPK","Grote zwart-witte specht met rode kuif."],
+["Frantzius' baardvogel","Prong-billed Barbet","Semnornis frantzii","B","m","groen,bruin,rood,grijs","nb","fr","MD","Ronde bergvogel die duetten zingt; alleen in Costa Rica en Panama."],
+["Roodkopbaardvogel","Red-headed Barbet","Eubucco bourcierii","B","k","rood,geel,groen","rn","fr","AD","Kleurrijke baardvogel met rode kop en gele borst."],
+["Driewattelklokvogel","Three-wattled Bellbird","Procnias tricarunculatus","B","g","bruin,wit","n","fr","M","Het mannetje heeft drie slappe lellen aan de snavel en een luide, metaalachtige roep."],
+["Kaalnekparasolvogel","Bare-necked Umbrellabird","Cephalopterus glabricollis","B","g","zwart","nr","fr","M","Zwarte vogel met een kale rode keelzak; trekt buiten het broedseizoen naar lagere gebieden."],
+["Geelsnavelcotinga","Yellow-billed Cotinga","Carpodectes antoniae","B","m","wit","k","fr","CO","Witte cotinga van de zuidelijke Pacifische kust, zeldzaam en bedreigd."],
+["Roodkapmanakin","Red-capped Manakin","Ceratopipra mentalis","A","k","zwart,rood","r","fr","COKT","Het mannetje heeft een felrode kop en gele dijen en danst op een baltsplaats."],
+["Witkraagmanakin","White-collared Manakin","Manacus candei","A","k","zwart,wit,geel","r","fr","TK","Mannetjes maken knallende geluiden met hun vleugels."],
+["Langstaartmanakin","Long-tailed Manakin","Chiroxiphia linearis","B","k","rood,blauw,zwart","r","fr","GP","Mannetjes voeren samen een baltsdans uit."],
+["Maskertityra","Masked Tityra","Tityra semifasciata","A","m","grijs,zwart,rood","rt","fr","GPK","Lichtgrijze vogel met zwarte kop en rode snavelbasis, zit hoog in bomen."],
+["Grote kiskadee","Great Kiskadee","Pitangus sulphuratus","A","m","geel,bruin,wit","tw","in,fr,vi","GPKT","Gele buik en zwart-wit gezicht; roept luid zijn eigen naam."],
+["Tropische koningstiran","Tropical Kingbird","Tyrannus melancholicus","A","m","geel,grijs","t","in","GPK","Algemene tiran op draden en boomtoppen die insecten in de lucht vangt."],
+["Grays lijster","Clay-colored Thrush","Turdus grayi","A","m","bruin","t","fr,in","GMP","Nationale vogel van Costa Rica; zijn zang kondigt het regenseizoen aan."],
+["Zwartwangsolitair","Black-faced Solitaire","Myadestes melanops","B","k","grijs,zwart,geel","nb","fr","MD","Schuwe bergvogel met een heldere, fluitende zang door het nevelwoud."],
+["Blauwgrijze tangare","Blue-gray Tanager","Thraupis episcopus","A","m","blauw,grijs","t","fr,in","KTP","Algemene blauwgrijze tangare in tuinen en op bosranden."],
+["Palmtangare","Palm Tanager","Thraupis palmarum","A","m","grijs,groen","t","fr","KPT","Olijfgrijze tangare die vaak in palmen zit."],
+["Passerini's tangare","Passerini's Tanager","Ramphocelus passerinii","A","m","zwart,rood","tr","fr,in","KTA","Het mannetje is fluweelzwart met felrode stuit; het vrouwtje is olijfgeel."],
+["Goudkaptangare","Golden-hooded Tanager","Stilpnia larvata","A","k","turquoise,geel,zwart","rt","fr","OCK","Kleine tangare met gouden kop en turquoise lichaam."],
+["Zomertangare","Summer Tanager","Piranga rubra","A","m","rood","t","in,fr","GP","Roodgekleurde wintergast uit Noord-Amerika, aanwezig van de herfst tot het voorjaar."],
+["Zilverkeeltangare","Silver-throated Tanager","Tangara icterocephala","A","k","geel,zwart,groen","nr","fr,in","MAK","Gele tangare met lichte keel, vaak in gemengde groepen."],
+["Pailletwangtangare","Spangle-cheeked Tanager","Tangara dowii","B","k","zwart,groen,blauw,oranje","nb","fr","D","Kleurrijke bergtangare, alleen in Costa Rica en West-Panama."],
+["Groene suikervogel","Green Honeycreeper","Chlorophanes spiza","A","k","groen,zwart,blauw","r","fr,ne","AKO","Overwegend groen met gele snavel, komt vaak op fruit af."],
+["Roodpootsuikervogel","Red-legged Honeycreeper","Cyanerpes cyaneus","A","k","blauw,zwart,geel","rt","ne,fr","KTO","Het mannetje is diepblauw met turquoise kruin en rode poten."],
+["Suikerdiefje","Bananaquit","Coereba flaveola","A","k","geel,zwart,wit","tr","ne,fr","KTO","Kleine vogel met gele borst die nectar steelt door gaatjes in bloemen."],
+["Variabele zaadeter","Variable Seedeater","Sporophila corvina","A","k","zwart,wit,bruin","t","za","KTPO","Zangerig vogeltje van grasland en tuinen."],
+["Vulkaanjunco","Volcano Junco","Junco vulcani","B","k","grijs,bruin,geel","b","in,za","D","Bergvink die alleen in de hoge bergen van Costa Rica en West-Panama leeft."],
+["Roodnekgors","Rufous-collared Sparrow","Zonotrichia capensis","A","k","grijs,bruin,wit","tb","za,in","MD","Gors met roestkleurige nekband en een eenvoudig liedje."],
+["Montezuma-oropendola","Montezuma Oropendola","Psarocolius montezuma","A","g","bruin,zwart,geel,blauw","rt","fr,in","TKA","Grote vogel met oranje snavelpunt en blauwe wang; hangt lange nesten in kolonies in bomen."],
+["Grote trupiaal","Great-tailed Grackle","Quiscalus mexicanus","A","g","zwart,paars","t","al","GPK","Veelvoorkomend rond steden en stranden; het mannetje is glanzend zwart met lange staart."],
+["Witkeelekster-gaai","White-throated Magpie-Jay","Calocitta formosa","B","g","blauw,wit,zwart","t","al","G","Lange staart en kuif; leeft in groepjes in het droge noordwesten."],
+["Gekraagde redstart","Collared Redstart","Myioborus torquatus","B","k","geel,zwart,grijs,rood","nb","in","DM","Beweeglijk vogeltje met gele buik en roodbruine kruin dat zijn staart spreidt."],
+["Roodnekwinterkoning","Rufous-naped Wren","Campylorhynchus rufinucha","B","m","bruin,wit","t","in","GP","Grote winterkoning van het droge noordwesten die bolvormige nesten bouwt."],
+["Baltimoretroepiaal","Baltimore Oriole","Icterus galbula","A","m","oranje,zwart","t","fr,ne,in","GPK","Oranje wintergast uit Noord-Amerika die graag op fruit en nectar afkomt."]
+];
+</script>
+
+<script id="config">
+/* Vul hier de gegevens van je Firebase-webapp in om samen af te vinken.
+   Laat apiKey en projectId leeg om zonder delen te werken (alleen op dit apparaat). */
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyBgvl72NqA2XvZAS0PKb2WlH7ZfUquBdts",
+  authDomain:"vogelscostarica.firebaseapp.com",
+  projectId:"vogelscostarica",
+  appId:"1:423076803792:web:d91a01b91063e4c3971ad5"
+};
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script id="app">
+(function(){
+"use strict";
+const REG={M:"Monteverde",O:"Osa-schiereiland",T:"Tortuguero",A:"Arenal",C:"Carara",D:"Cerro de la Muerte",G:"Guanacaste",K:"Caribische kust",P:"Pacifische kust"};
+const HAB={r:"regenwoud",n:"nevelwoud",k:"kust/mangrove",w:"moeras/wetland",b:"bergen",t:"tuinen/open land"};
+const FOOD={ne:"nectar",fr:"fruit",in:"insecten",vi:"vis",ro:"roofvogel",za:"zaden",al:"alleseter"};
+const SIZE={k:"klein",m:"middel",g:"groot"};
+const COLORS=["rood","oranje","geel","groen","turquoise","blauw","paars","roze","bruin","grijs","zwart","wit"];
+const STATUS=[["all","Alle"],["none","Nog niets"],["heard","Gehoord"],["seen","Gezien"],["both","Beide"],["ho","Alleen gehoord"],["so","Alleen gezien"]];
+const TYPES=[["A","Algemeen"],["B","Bijzonder"]];
+
+const BIRDS=ROWS.map((r,i)=>({
+  i,nl:r[0],en:r[1],sci:r[2],type:r[3],size:r[4],colors:r[5].split(","),
+  hab:r[6].split(""),food:r[7].split(","),reg:r[8].split(""),desc:r[9]
+}));
+const BY=Object.fromEntries(BIRDS.map(b=>[b.sci,b]));
+const TOTAL=BIRDS.length;
+
+const STORE="cr-vogels-v1",PHOTOS="cr-vogels-foto-v1",PREFS="cr-vogels-prefs-v1";
+function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+const CONFIG_OK=!!(typeof FIREBASE_CONFIG!=="undefined"&&FIREBASE_CONFIG.apiKey&&FIREBASE_CONFIG.projectId);
+let rec=CONFIG_OK?{}:load(STORE,{}),photos=load(PHOTOS,{}),prefs=load(PREFS,{view:"grid",sort:"fam"});
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+
+const ICON={
+  sound:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>',
+  bird:'<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M10 40c0-12 9-20 20-20 3 0 5 1 7 2l10-7-2 11c2 3 3 6 3 10 0 12-10 20-22 20-8 0-16-6-16-16z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="40" cy="26" r="2" fill="currentColor"/></svg>'
+};
+
+/* ---------- opslag en gedeelde lijst ---------- */
+const WHO_KEY="cr-vogels-wie-v1",UPLOADED="cr-vogels-upload-v1";
+let cloud=null,unsub=null,me=load(WHO_KEY,{name:"",group:""});
+const slug=s=>s.replace(/ /g,"_");
+function cleanGroup(s){return String(s||"").toLowerCase().trim().replace(/\s+/g,"-").replace(/[^a-z0-9_-]/g,"").slice(0,40)}
+function meOk(){return !!(me.name&&cleanGroup(me.group).length>=4)}
+/* mine: heb ik dit zelf aangevinkt. oth: is het door iemand anders aangevinkt. */
+function mine(r,w){return cloud?!!(r[w+"By"]&&r[w+"By"].includes(me.name)):!!r[w]}
+function oth(r,w){return (cloud&&r[w]&&!mine(r,w))?" other":""}
+
+function setRec(sci,patch){
+  const old=rec[sci]||{};
+  const n=Object.assign({},old,patch);
+  ["date","loc","region","note"].forEach(k=>{if(!n[k])delete n[k]});
+  ["heard","seen"].forEach(w=>{
+    if(Array.isArray(n[w+"By"]))n[w]=n[w+"By"].length>0;
+    if(!n[w]){delete n[w];delete n[w+"By"]}
+  });
+  if(Object.keys(n).length)rec[sci]=n;else delete rec[sci];
+  if(!cloud)save(STORE,rec);
+  push(sci,old,n);
+}
+function push(sci,old,n){
+  if(!cloud)return;
+  const FV=firebase.firestore.FieldValue,ref=cloud.col.doc(slug(sci));
+  if(!Object.keys(n).length){ref.delete().catch(onErr);return}
+  const upd={sci:sci};
+  ["date","loc","region","note"].forEach(k=>{
+    if(n[k]===undefined){if(old[k]!==undefined)upd[k]=FV.delete()}
+    else if(n[k]!==old[k])upd[k]=n[k];
+  });
+  ["heardBy","seenBy"].forEach(k=>{
+    const o=old[k]||[],a=n[k]||[];
+    const add=a.filter(x=>!o.includes(x)),rem=o.filter(x=>!a.includes(x));
+    if(add.length)upd[k]=FV.arrayUnion.apply(null,add);
+    else if(rem.length)upd[k]=FV.arrayRemove.apply(null,rem);
+  });
+  ref.set(upd,{merge:true}).catch(onErr);
+}
+function toggle(sci,which){
+  const r=rec[sci]||{},patch={};
+  if(cloud){
+    if(!me.name){openWho();return}
+    const arr=(r[which+"By"]||[]).slice(),i=arr.indexOf(me.name);
+    if(i>=0)arr.splice(i,1);else arr.push(me.name);
+    patch[which+"By"]=arr;
+    if(arr.length&&!r.date)patch.date=today();
+  }else{
+    patch[which]=!r[which];
+    if(patch[which]&&!r.date)patch.date=today();
+  }
+  setRec(sci,patch);
+}
+/* tekstvelden pas na een korte pauze opslaan, zodat niet elke toetsaanslag wordt verstuurd */
+let tTimer=null,tPending=null;
+function queueText(sci,patch){
+  tPending={sci:sci,patch:Object.assign(tPending&&tPending.sci===sci?tPending.patch:{},patch)};
+  clearTimeout(tTimer);tTimer=setTimeout(flushText,600);
+}
+function flushText(){
+  clearTimeout(tTimer);
+  if(tPending){const p=tPending;tPending=null;setRec(p.sci,p.patch)}
+}
+function importOne(sci,e){
+  const r=rec[sci]||{},p={};
+  ["date","loc","region","note"].forEach(k=>{if(e[k]&&!r[k])p[k]=String(e[k]).slice(0,500)});
+  ["heard","seen"].forEach(w=>{
+    if(cloud){
+      const inc=Array.isArray(e[w+"By"])?e[w+"By"]:(e[w]?[me.name||"ik"]:[]);
+      const cur=r[w+"By"]||[];
+      const un=cur.concat(inc.filter(x=>x&&!cur.includes(x)));
+      if(un.length>cur.length)p[w+"By"]=un;
+    }else if(e[w]&&!r[w])p[w]=true;
+  });
+  if(Object.keys(p).length)setRec(sci,p);
+}
+function hasLocal(){
+  try{if(localStorage.getItem(UPLOADED))return false}catch(e){return false}
+  return Object.keys(load(STORE,{})).length>0;
+}
+function onErr(e){setSync("error");try{console.error(e)}catch(x){}}
+function setSync(st){
+  const txt={
+    local:"Niet gedeeld: je vinkjes staan alleen op dit apparaat.",
+    none:"Vul je naam en groepscode in om samen af te vinken.",
+    connecting:"Verbinden met de gedeelde lijst…",
+    error:"Geen verbinding met de gedeelde lijst. Controleer je internet en de Firestore-regels.",
+    live:"Gedeelde lijst “"+me.group+"”. Jij bent "+me.name+"."
+  };
+  $("#dot").className="dot"+(st==="live"?" live":st==="error"?" err":"");
+  $("#syncTxt").textContent=txt[st];
+  $("#shareBtn").hidden=st!=="live";
+  $("#whoBtn").hidden=!CONFIG_OK;
+  $("#whoBtn").textContent=st==="none"?"Instellen":"Wijzig";
+  $("#uploadBtn").hidden=!(st==="live"&&hasLocal());
+}
+function connect(){
+  if(unsub){unsub();unsub=null}
+  cloud=null;rec={};
+  me.group=cleanGroup(me.group);save(WHO_KEY,me);
+  try{history.replaceState(null,"","#"+me.group)}catch(e){}
+  if(typeof firebase==="undefined"){setSync("error");refresh();return}
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    const fs=firebase.firestore();
+    cloud={fs:fs,col:fs.collection("lijsten").doc(me.group).collection("waarnemingen")};
+    setSync("connecting");refresh();
+    unsub=cloud.col.onSnapshot(snap=>{
+      const next={};
+      snap.forEach(d=>{
+        const v=d.data(),s=v.sci;
+        if(!BY[s])return;
+        delete v.sci;
+        ["heard","seen"].forEach(w=>{
+          if(v[w+"By"]&&v[w+"By"].length)v[w]=true;else{delete v[w];delete v[w+"By"]}
+        });
+        next[s]=v;
+      });
+      rec=next;setSync("live");refresh();
+      if(openSci)syncModalToggles();
+    },onErr);
+  }catch(e){onErr(e)}
+}
+function openWho(){
+  $("#wName").value=me.name||"";$("#wCode").value=me.group||"";$("#wErr").textContent="";
+  $("#wCancel").hidden=!meOk();
+  $("#wOverlay").hidden=false;document.body.style.overflow="hidden";
+  setTimeout(()=>$("#wName").focus(),0);
+}
+function closeWho(){
+  if($("#wOverlay").hidden||!meOk())return;
+  $("#wOverlay").hidden=true;if(!openSci)document.body.style.overflow="";
+}
+function init(){
+  let hg="";
+  try{hg=cleanGroup(decodeURIComponent(location.hash.slice(1)))}catch(e){}
+  if(hg.length>=4)me.group=hg;
+  if(!CONFIG_OK){setSync("local");return}
+  if(meOk())connect();else{setSync("none");openWho()}
+}
+
+/* ---------- filters ---------- */
+const F={q:"",status:"all",type:new Set(),color:new Set(),size:new Set(),hab:new Set(),food:new Set(),reg:new Set(),where:""};
+
+function haystack(b){
+  const r=rec[b.sci]||{};
+  return norm([b.nl,b.en,b.sci,b.type==="B"?"bijzonder":"algemeen",SIZE[b.size],
+    b.colors.join(" "),b.hab.map(h=>HAB[h]).join(" "),b.food.map(f=>FOOD[f]).join(" "),
+    b.reg.map(x=>REG[x]).join(" "),r.loc,r.region&&REG[r.region],r.note,(r.heardBy||[]).join(" "),(r.seenBy||[]).join(" ")].join(" "));
+}
+function statusOk(b){
+  const r=rec[b.sci]||{},h=!!r.heard,s=!!r.seen;
+  switch(F.status){
+    case"none":return!h&&!s;
+    case"heard":return h;
+    case"seen":return s;
+    case"both":return h&&s;
+    case"ho":return h&&!s;
+    case"so":return s&&!h;
+    default:return true;
+  }
+}
+function matches(b){
+  if(!statusOk(b))return false;
+  if(F.type.size&&!F.type.has(b.type))return false;
+  if(F.size.size&&!F.size.has(b.size))return false;
+  if(F.color.size&&!b.colors.some(c=>F.color.has(c)))return false;
+  if(F.hab.size&&!b.hab.some(c=>F.hab.has(c)))return false;
+  if(F.food.size&&!b.food.some(c=>F.food.has(c)))return false;
+  if(F.reg.size&&!b.reg.some(c=>F.reg.has(c)))return false;
+  if(F.where){
+    const r=rec[b.sci]||{};
+    const loc=(r.loc||"").trim(),reg=r.region?REG[r.region]:"";
+    if(loc!==F.where&&reg!==F.where)return false;
+  }
+  if(F.q){
+    const h=haystack(b);
+    if(!norm(F.q).split(/\s+/).filter(Boolean).every(t=>h.includes(t)))return false;
+  }
+  return true;
+}
+
+/* ---------- foto's ---------- */
+const pending=new Set(),queue=[];let active=0;
+function slotHTML(b){
+  const u=photos[b.sci];
+  return u?'<img src="'+esc(u)+'" alt="'+esc(b.nl)+'" loading="lazy" decoding="async">':ICON.bird;
+}
+function ensurePhoto(sci){
+  if(photos[sci]!==undefined||pending.has(sci))return;
+  pending.add(sci);queue.push(sci);pump();
+}
+function pump(){
+  while(active<4&&queue.length){
+    const sci=queue.shift();active++;
+    fetchPhoto(BY[sci]).then(url=>{
+      active--;pending.delete(sci);
+      if(url!==null){photos[sci]=url;save(PHOTOS,photos);paintPhoto(sci)}
+      pump();
+    });
+  }
+}
+async function fetchPhoto(b){
+  for(const name of [b.sci,b.en]){
+    try{
+      const r=await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/"+encodeURIComponent(name.replace(/ /g,"_"))+"?redirect=true");
+      if(!r.ok)continue;
+      const d=await r.json();
+      if(d.type==="disambiguation")continue;
+      if(d.thumbnail&&d.thumbnail.source)return d.thumbnail.source;
+    }catch(e){return null}
+  }
+  return"";
+}
+function paintPhoto(sci){
+  document.querySelectorAll('.photo[data-sci="'+CSS.escape(sci)+'"] .slot').forEach(s=>{s.innerHTML=slotHTML(BY[sci])});
+}
+const io="IntersectionObserver"in window?new IntersectionObserver(es=>{
+  es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);ensurePhoto(e.target.dataset.sci)}});
+},{rootMargin:"400px"}):null;
+function watchPhotos(root){
+  root.querySelectorAll(".photo").forEach(p=>{
+    const sci=p.dataset.sci;
+    if(photos[sci]!==undefined)return;
+    if(io)io.observe(p);else ensurePhoto(sci);
+  });
+}
+
+/* ---------- weergave ---------- */
+function tagline(b){
+  return [SIZE[b.size],b.colors.join(", "),b.hab.map(h=>HAB[h]).join(", ")].join(" · ");
+}
+function cardHTML(b){
+  const r=rec[b.sci]||{},both=r.heard&&r.seen;
+  let log="";
+  if(r.heard||r.seen){
+    const bits=[];
+    if(r.loc)bits.push(esc(r.loc));else if(r.region)bits.push(esc(REG[r.region]));
+    if(r.date)bits.push(esc(r.date));
+    if(bits.length)log='<p class="loginfo">Waargenomen: '+bits.join(" · ")+"</p>";
+    const by=[];
+    if(r.heard&&r.heardBy&&r.heardBy.length)by.push("Gehoord door "+esc(r.heardBy.join(", ")));
+    if(r.seen&&r.seenBy&&r.seenBy.length)by.push("Gezien door "+esc(r.seenBy.join(", ")));
+    if(by.length)log+='<p class="loginfo">'+by.join(" · ")+"</p>";
+  }
+  return '<article class="card'+(both?" both":"")+'" data-sci="'+esc(b.sci)+'">'+
+    '<div class="photo" data-sci="'+esc(b.sci)+'"><div class="slot">'+slotHTML(b)+"</div>"+
+    '<span class="pill type'+(b.type==="B"?" sp":"")+'">'+(b.type==="B"?"Bijzonder":"Algemeen")+"</span>"+
+    (both?'<span class="pill both">Beide</span>':"")+"</div>"+
+    '<div class="cbody"><button class="name" data-act="open">'+esc(b.nl)+"</button>"+
+    '<p class="sub">'+esc(b.en)+" · <i>"+esc(b.sci)+"</i></p>"+
+    '<p class="tags">'+esc(tagline(b))+"</p>"+
+    '<p class="desc">'+esc(b.desc)+"</p>"+log+
+    '<div class="acts">'+
+    '<button class="tg heard'+oth(r,"heard")+'" data-act="heard" aria-pressed="'+mine(r,"heard")+'">'+ICON.sound+"Gehoord</button>"+
+    '<button class="tg seen'+oth(r,"seen")+'" data-act="seen" aria-pressed="'+mine(r,"seen")+'">'+ICON.eye+"Gezien</button>"+
+    "</div></div></article>";
+}
+function sorted(list){
+  const a=list.slice();
+  if(prefs.sort==="az")a.sort((x,y)=>x.nl.localeCompare(y.nl,"nl"));
+  else if(prefs.sort==="sp")a.sort((x,y)=>(y.type==="B")-(x.type==="B")||x.i-y.i);
+  return a;
+}
+function renderList(){
+  const list=$("#list");
+  const shown=sorted(BIRDS.filter(matches));
+  list.classList.toggle("list",prefs.view==="list");
+  $("#viewBtn").textContent=prefs.view==="list"?"Kaartweergave":"Lijstweergave";
+  list.innerHTML=shown.length?shown.map(cardHTML).join(""):'<p class="empty">Geen vogels gevonden. Pas de zoekterm of filters aan.</p>';
+  $("#count").textContent=shown.length+" van "+TOTAL+" vogels getoond";
+  watchPhotos(list);
+  updateShow();
+}
+function renderStats(){
+  let h=0,s=0,b=0;
+  BIRDS.forEach(x=>{const r=rec[x.sci];if(!r)return;if(r.heard)h++;if(r.seen)s++;if(r.heard&&r.seen)b++});
+  const any=h+s-b;
+  $("#nHeard").textContent=h;$("#nSeen").textContent=s;$("#nBoth").textContent=b;$("#nAny").textContent=any;
+  $("#barBoth").style.width=(b/TOTAL*100)+"%";
+  $("#barHeard").style.width=((h-b)/TOTAL*100)+"%";
+  $("#barSeen").style.width=((s-b)/TOTAL*100)+"%";
+}
+function renderWhere(){
+  const set=new Set();
+  Object.values(rec).forEach(r=>{if(r.loc&&r.loc.trim())set.add(r.loc.trim());if(r.region)set.add(REG[r.region])});
+  const opts=[...set].sort((a,b)=>a.localeCompare(b,"nl"));
+  if(F.where&&!set.has(F.where))F.where="";
+  $("#whereSel").innerHTML='<option value="">Alle plekken</option>'+opts.map(o=>'<option value="'+esc(o)+'"'+(o===F.where?" selected":"")+">"+esc(o)+"</option>").join("");
+}
+function refresh(){renderStats();renderWhere();syncChips();renderList()}
+
+/* ---------- filterchips ---------- */
+function buildChips(id,pairs,key,single){
+  const box=$(id);
+  box.innerHTML=pairs.map(p=>'<button class="chip" type="button" data-v="'+esc(p[0])+'" aria-pressed="false">'+esc(p[1])+"</button>").join("");
+  box.addEventListener("click",e=>{
+    const c=e.target.closest(".chip");if(!c)return;
+    const v=c.dataset.v;
+    if(single){F.status=v}else{F[key].has(v)?F[key].delete(v):F[key].add(v)}
+    syncChips();renderList();
+  });
+}
+function syncChips(){
+  const map={"#fStatus":()=>F.status,"#fType":"type","#fColor":"color","#fSize":"size","#fHab":"hab","#fFood":"food","#fReg":"reg"};
+  Object.keys(map).forEach(id=>{
+    document.querySelectorAll(id+" .chip").forEach(c=>{
+      const on=id==="#fStatus"?F.status===c.dataset.v:F[map[id]].has(c.dataset.v);
+      c.setAttribute("aria-pressed",on);
+    });
+  });
+  const n=F.type.size+F.color.size+F.size.size+F.hab.size+F.food.size+F.reg.size+(F.status!=="all"?1:0)+(F.where?1:0);
+  $("#filterBtn").textContent=n?"Filters ("+n+")":"Filters";
+  const cnt={status:F.status!=="all"?1:0,type:F.type.size,color:F.color.size,size:F.size.size,hab:F.hab.size,food:F.food.size,reg:F.reg.size,where:F.where?1:0};
+  document.querySelectorAll(".acc-count").forEach(el=>{const v=cnt[el.dataset.k];el.textContent=v?String(v):""});
+}
+
+/* ---------- details ---------- */
+let openSci=null;
+function openModal(sci){
+  const b=BY[sci],r=rec[sci]||{};
+  openSci=sci;
+  const regOpts='<option value="">Kies een regio</option>'+Object.keys(REG).map(k=>'<option value="'+k+'"'+(r.region===k?" selected":"")+">"+REG[k]+"</option>").join("");
+  $("#sheet").innerHTML=
+    '<div class="photo" data-sci="'+esc(sci)+'" style="position:relative"><div class="slot">'+slotHTML(b)+"</div>"+
+    '<button class="close" id="closeBtn" aria-label="Sluiten">&times;</button></div>'+
+    '<div class="inner"><div><h2>'+esc(b.nl)+"</h2>"+
+    '<p class="sub">'+esc(b.en)+" · <i>"+esc(b.sci)+"</i></p></div>"+
+    "<p>"+esc(b.desc)+"</p>"+
+    '<dl class="facts">'+
+    "<dt>Soort</dt><dd>"+(b.type==="B"?"Bijzonder":"Algemeen")+"</dd>"+
+    "<dt>Grootte</dt><dd>"+SIZE[b.size]+"</dd>"+
+    "<dt>Kleuren</dt><dd>"+esc(b.colors.join(", "))+"</dd>"+
+    "<dt>Habitat</dt><dd>"+esc(b.hab.map(h=>HAB[h]).join(", "))+"</dd>"+
+    "<dt>Voedsel</dt><dd>"+esc(b.food.map(f=>FOOD[f]).join(", "))+"</dd>"+
+    "<dt>Waar te vinden</dt><dd>"+esc(b.reg.map(x=>REG[x]).join(", "))+"</dd></dl>"+
+    '<div class="acts" style="padding-top:0">'+
+    '<button class="tg heard'+oth(r,"heard")+'" data-act="heard" aria-pressed="'+mine(r,"heard")+'">'+ICON.sound+"Gehoord (Merlin)</button>"+
+    '<button class="tg seen'+oth(r,"seen")+'" data-act="seen" aria-pressed="'+mine(r,"seen")+'">'+ICON.eye+"Gezien</button></div>"+
+    '<div class="form"><div class="two">'+
+    '<label for="mDate">Datum<input id="mDate" type="date" value="'+esc(r.date||"")+'"></label>'+
+    '<label for="mReg">Regio<select id="mReg">'+regOpts+"</select></label></div>"+
+    '<label for="mLoc">Plek (bijvoorbeeld lodge of wandelroute)<input id="mLoc" type="text" value="'+esc(r.loc||"")+'" autocomplete="off"></label>'+
+    '<label for="mNote">Notitie<textarea id="mNote" rows="3">'+esc(r.note||"")+"</textarea></label></div></div>";
+  $("#overlay").hidden=false;
+  document.body.style.overflow="hidden";
+  watchPhotos($("#sheet"));
+  $("#closeBtn").focus();
+}
+function closeModal(){
+  if(!openSci)return;
+  flushText();
+  openSci=null;$("#overlay").hidden=true;document.body.style.overflow="";
+  refresh();
+}
+function syncModalToggles(){
+  const r=rec[openSci]||{};
+  $("#sheet").querySelectorAll(".tg").forEach(t=>{const w=t.dataset.act;t.setAttribute("aria-pressed",mine(r,w));t.classList.toggle("other",oth(r,w)!=="")});
+  const d=$("#mDate");if(d&&r.date&&!d.value)d.value=r.date;
+}
+
+/* ---------- events ---------- */
+$("#list").addEventListener("click",e=>{
+  const a=e.target.closest("[data-act]");if(!a)return;
+  const sci=a.closest(".card").dataset.sci;
+  if(a.dataset.act==="open"){openModal(sci);return}
+  toggle(sci,a.dataset.act);refresh();
+});
+$("#list").addEventListener("error",e=>{
+  if(e.target.tagName==="IMG"){
+    const slot=e.target.parentNode;slot.innerHTML=ICON.bird;
+  }
+},true);
+$("#sheet").addEventListener("click",e=>{
+  if(e.target.closest("#closeBtn")){closeModal();return}
+  const a=e.target.closest(".tg");
+  if(a){toggle(openSci,a.dataset.act);syncModalToggles()}
+});
+$("#sheet").addEventListener("input",e=>{
+  const id=e.target.id;
+  if(id==="mDate")setRec(openSci,{date:e.target.value});
+  else if(id==="mReg")setRec(openSci,{region:e.target.value});
+  else if(id==="mLoc")queueText(openSci,{loc:e.target.value});
+  else if(id==="mNote")queueText(openSci,{note:e.target.value});
+});
+$("#overlay").addEventListener("click",e=>{if(e.target.id==="overlay")closeModal()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeFilters();closeModal();closeWho()}});
+
+$("#q").addEventListener("input",e=>{F.q=e.target.value;renderList()});
+function updateShow(){
+  const n=BIRDS.filter(matches).length;
+  $("#fShow").textContent="Toon "+n+(n===1?" vogel":" vogels");
+}
+function openFilters(){
+  $("#fOverlay").hidden=false;document.body.style.overflow="hidden";
+  $("#filterBtn").setAttribute("aria-expanded","true");updateShow();
+}
+function closeFilters(){
+  if($("#fOverlay").hidden)return;
+  $("#fOverlay").hidden=true;if(!openSci)document.body.style.overflow="";
+  $("#filterBtn").setAttribute("aria-expanded","false");
+}
+$("#filterBtn").addEventListener("click",openFilters);
+$("#fClose").addEventListener("click",closeFilters);
+$("#fShow").addEventListener("click",closeFilters);
+$("#fOverlay").addEventListener("click",e=>{if(e.target.id==="fOverlay")closeFilters()});
+$("#whereSel").addEventListener("change",e=>{F.where=e.target.value;syncChips();renderList()});
+$("#sortSel").addEventListener("change",e=>{prefs.sort=e.target.value;save(PREFS,prefs);renderList()});
+$("#viewBtn").addEventListener("click",()=>{prefs.view=prefs.view==="list"?"grid":"list";save(PREFS,prefs);renderList()});
+$("#clearBtn").addEventListener("click",()=>{
+  F.status="all";["type","color","size","hab","food","reg"].forEach(k=>F[k].clear());F.where="";F.q="";
+  $("#q").value="";$("#whereSel").value="";syncChips();renderList();
+});
+
+/* export / import / reset */
+let toastT;
+function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3200)}
+$("#exportBtn").addEventListener("click",()=>{
+  const data={app:"vogels-costa-rica",versie:1,datum:new Date().toISOString(),waarnemingen:rec};
+  try{
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="vogels-costa-rica-"+today()+".json";
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast("Lijst geëxporteerd");
+  }catch(e){toast("Exporteren is niet gelukt in deze browser")}
+});
+$("#importBtn").addEventListener("click",()=>$("#importFile").click());
+$("#importFile").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result),w=d.waarnemingen||d;
+      let n=0;
+      Object.keys(w).forEach(k=>{if(BY[k]&&w[k]&&typeof w[k]==="object"){importOne(k,w[k]);n++}});
+      refresh();toast(n+" vogels geïmporteerd");
+    }catch(err){toast("Dit bestand kon niet worden gelezen")}
+  };
+  rd.readAsText(f);e.target.value="";
+});
+$("#resetBtn").addEventListener("click",()=>{
+  $("#resetMsg").textContent=cloud?"Alle vinkjes en notities wissen voor iedereen in groep \u201c"+me.group+"\u201d? Dit kan niet ongedaan worden gemaakt.":"Alle vinkjes en notities wissen? Dit kan niet ongedaan worden gemaakt.";
+  $("#resetConfirm").hidden=false;
+});
+$("#resetNo").addEventListener("click",()=>{$("#resetConfirm").hidden=true});
+$("#resetYes").addEventListener("click",()=>{
+  if(cloud){
+    const b=cloud.fs.batch();
+    Object.keys(rec).forEach(k=>b.delete(cloud.col.doc(slug(k))));
+    b.commit().catch(onErr);
+  }
+  rec={};if(!cloud)save(STORE,rec);
+  $("#resetConfirm").hidden=true;refresh();toast("Lijst gewist");
+});
+
+/* gedeelde lijst: knoppen */
+$("#wForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const name=$("#wName").value.trim().slice(0,30),code=cleanGroup($("#wCode").value);
+  if(!name){$("#wErr").textContent="Vul je naam in.";return}
+  if(code.length<4){$("#wErr").textContent="De groepscode heeft minstens 4 tekens (letters, cijfers of streepjes).";return}
+  me={name:name,group:code};
+  $("#wOverlay").hidden=true;if(!openSci)document.body.style.overflow="";
+  connect();
+});
+$("#wCancel").addEventListener("click",closeWho);
+$("#wOverlay").addEventListener("click",e=>{if(e.target.id==="wOverlay")closeWho()});
+$("#whoBtn").addEventListener("click",openWho);
+$("#shareBtn").addEventListener("click",()=>{
+  const url=location.href.split("#")[0]+"#"+me.group;
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(()=>toast("Link gekopieerd. Deel hem met de anderen."),()=>toast(url));
+  else toast(url);
+});
+$("#uploadBtn").addEventListener("click",()=>{
+  const loc=load(STORE,{});let n=0;
+  Object.keys(loc).forEach(k=>{if(BY[k]&&loc[k]&&typeof loc[k]==="object"){importOne(k,loc[k]);n++}});
+  try{localStorage.setItem(UPLOADED,"1")}catch(e){}
+  $("#uploadBtn").hidden=true;toast(n+" lokale vogels toegevoegd aan de gedeelde lijst");
+});
+
+/* start */
+buildChips("#fStatus",STATUS,null,true);
+buildChips("#fType",TYPES,"type");
+buildChips("#fColor",COLORS.filter(c=>BIRDS.some(b=>b.colors.includes(c))).map(c=>[c,c]),"color");
+buildChips("#fSize",Object.entries(SIZE),"size");
+buildChips("#fHab",Object.entries(HAB),"hab");
+buildChips("#fFood",Object.entries(FOOD),"food");
+buildChips("#fReg",Object.entries(REG),"reg");
+$("#sortSel").value=prefs.sort||"fam";
+syncChips();refresh();init();
+})();
+</script>
+</body>
+</html>
